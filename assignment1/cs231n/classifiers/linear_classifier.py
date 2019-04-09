@@ -56,7 +56,10 @@ class LinearClassifier(object):
             # replacement is faster than sampling without replacement.              #
             #########################################################################
             # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
-
+            # Produce a list of indices to pull training samples from
+            sgdIndices = np.random.choice(num_train, batch_size)
+            X_batch = X[sgdIndices]
+            y_batch = y[sgdIndices]
             pass
 
             # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
@@ -72,6 +75,8 @@ class LinearClassifier(object):
             #########################################################################
             # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
+            # W = W - eta*grad(W)
+            self.W = self.W - learning_rate*grad
             pass
 
             # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
