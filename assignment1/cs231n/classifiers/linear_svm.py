@@ -36,13 +36,22 @@ def svm_loss_naive(W, X, y, reg):
             margin = scores[j] - correct_class_score + 1 # note delta = 1
             if margin > 0:
                 loss += margin
+                # Calculate gradient dW for positive margin
+                # Decrement weight on predicted class
+                dW[:, y[i]] -= X[i,:]
+                # Increment weight for jth class (true class)
+                dW[:, j] += X[i,:]
 
     # Right now the loss is a sum over all training examples, but we want it
     # to be an average instead so we divide by num_train.
     loss /= num_train
+    # Normalize the derivative across number of training examples
+    dW /= num_train
 
     # Add regularization to the loss.
     loss += reg * np.sum(W * W)
+    # Regularize the gradient
+    dW += reg*W
 
     #############################################################################
     # TODO:                                                                     #
@@ -53,7 +62,7 @@ def svm_loss_naive(W, X, y, reg):
     # code above to compute the gradient.                                       #
     #############################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
-
+    # IMPLEMENTED INLINE - SEE ABOVE!
     pass
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
@@ -77,7 +86,19 @@ def svm_loss_vectorized(W, X, y, reg):
     # result in loss.                                                           #
     #############################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
-
+    N = np.arange(X.shape[0])
+    # Compute the entire score matrix
+    scores = np.dot(X, W)
+    # Pull actual class labels for X
+    correct_class_scores = scores[N, y]
+    # Compute the margin for all scores against actual labels
+    margin = np.maximum(0, 1 + (scores - correct_class_scores[:, np.newaxis]))
+    # Do not count y_i in the margin
+    margin[N, y] = 0
+    # Take sum across training samples
+    marginSum = np.sum(margin, axis = 1)
+    # Average across training samples and regularize loss
+    loss = np.mean(marginSum) + 0.5*reg*np.sum(W*W)
     pass
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
@@ -92,7 +113,14 @@ def svm_loss_vectorized(W, X, y, reg):
     # loss.                                                                     #
     #############################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
-
+    # Convert to zero-one loss (gradient of hinge loss) and sum across all training samples
+    binaryMargins = margin
+    binaryMargins[margin>0] = 1
+    binaryMargins[N, y] = -np.sum(binaryMargins, axis = 1).T
+    # Compute gradient, normalize, and regularize
+    dW = np.dot(X.T, binaryMargins)
+    dW = dW / X.shape[0]
+    dW = dW + 2*reg*W
     pass
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
