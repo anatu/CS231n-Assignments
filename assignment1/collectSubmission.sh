@@ -45,7 +45,7 @@ echo ""
 
 echo -e "${C_BLD}### Copying to ${SUID}@myth.stanford.edu:${REMOTE_DIR} ###${C_E}"
 echo -e "${C_G}Note: if myth is under heavy use, this may hang: If this happens, rerun the script.${C_E}"
-FILES="${FILES} ${LOCAL_DIR}/${ZIP_FILENAME}"
+FILES="${FILES} ${ZIP_FILENAME}"
 rsync -avP ${FILES} ${SUID}@myth.stanford.edu:${REMOTE_DIR}
 echo ""
 
