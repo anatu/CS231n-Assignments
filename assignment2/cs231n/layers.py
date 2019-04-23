@@ -26,7 +26,9 @@ def affine_forward(x, w, b):
     # will need to reshape the input into rows.                               #
     ###########################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
-
+    # Flatten the images so that we have a Nsamples x d 2D matrix
+    resh = x.reshape(x.shape[0], -1)
+    out = np.dot(resh, w) + b
     pass
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
