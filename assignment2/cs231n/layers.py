@@ -61,7 +61,18 @@ def affine_backward(dout, cache):
     # TODO: Implement the affine backward pass.                               #
     ###########################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
-
+    # dx 
+    # Dimensions: dout = (N,M), w^T=(M,D) result = NxD
+    dx = np.dot(dout, w.T)
+    # Reshape back to original x dims
+    dx = dx.reshape(x.shape)
+    # dw
+    # x dot dout (NxM) (MxN)
+    resh = x.reshape(x.shape[0], -1)
+    dw = np.dot(resh.T, dout)
+    # db - column-major sum across dout
+    db = np.sum(dout, axis = 0)
+    
     pass
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
@@ -87,7 +98,8 @@ def relu_forward(x):
     # TODO: Implement the ReLU forward pass.                                  #
     ###########################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
-
+    
+    out = np.maximum(x, 0)
     pass
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
@@ -114,7 +126,11 @@ def relu_backward(dout, cache):
     # TODO: Implement the ReLU backward pass.                                 #
     ###########################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
-
+    
+    # Apply mask to input x to see which are activated by ReLU
+    xMask = 1*(x > 0)
+    # Multiply by upstream dout for derivatives
+    dx = dout*xMask
     pass
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
