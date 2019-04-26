@@ -210,7 +210,22 @@ def batchnorm_forward(x, gamma, beta, bn_param):
         # might prove to be helpful.                                          #
         #######################################################################
         # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
-
+        # Calculate standard normal variable Z
+        mean = np.mean(x, axis=0)
+        var = np.var(x, axis=0)
+        varDenom = 1./np.sqrt(var+eps)
+        
+        xdev = x - mean
+        xhat = xdev*varDenom
+        
+        # Scale and shift 
+        out = gamma*xhat + beta
+        
+        # Update running mean and variance
+        running_mean = momentum*running_mean + (1-momentum)*mean
+        running_var = momentum*running_var + (1-momentum)*var
+        
+        cache = (xhat, xdev, var, varDenom, gamma, eps) 
         pass
 
         # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
@@ -225,7 +240,9 @@ def batchnorm_forward(x, gamma, beta, bn_param):
         # Store the result in the out variable.                               #
         #######################################################################
         # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
-
+        
+        Z = (x-running_mean)/np.sqrt(running_var+eps)
+        out = gamma*Z + beta
         pass
 
         # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
@@ -267,7 +284,50 @@ def batchnorm_backward(dout, cache):
     # might prove to be helpful.                                              #
     ###########################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
+    N,D = dout.shape
+    
+    # Pull intermediates from the cache
+    xhat, xdev, var, varDenom, gamma, eps = cache
+    
+    # First, dbeta and dgamma w.r.t output
+    # Addition gate for beta: mult by 1
+    dbeta = np.sum(dout, axis=0)
+    # Mult gate for gamma: Multiply by other variable
+    # Don't sum for dxhat since dims are NxD
+    dgamma = np.sum(dout*xhat, axis=0)
+    dxhat = dout*gamma
+    
+    # Mult gate for Z calc ((x-mu)*(1/var)) i.e. xdev*varDenom
+    # Don't sum dxdev since it's NxD
+    dxdev = dxhat*varDenom
+    dvarDenom = np.sum(dxhat*xdev, axis=0)
+    
+    # Reciprocal gate for variance, grad is -1/u^2 * du
+    dsqVar = (-1./np.sqrt(var+eps)**2)*dvarDenom
+    
+    # Square root gate for var + eps, grad is 1/2sqrt(u) * du
+    dvar = (0.5*1./np.sqrt(var+eps))*dsqVar
 
+    # Sigma gate for mean calculation
+    dsigma = (1./N)*np.ones((N,D))*dvar
+    
+    # Square gate for variance calculation. Grad is 2u*du
+    dxdev2 = 2*xdev*dsigma
+    
+    # Subtraction gate for mean-centering (x - mu)
+    # has two outputs - one to go into variance, one to go into normalization calc
+    # First, backprop gradient from both the output branches (i.e. both xdevs resulting from this subtraction)
+    dx1 = dxdev + dxdev2
+    # Then take dmean of subtraction gate
+    dmean = -1.*np.sum(dx1, axis=0)
+    
+    # Sigma gate for other xdev
+    dsigma2 = (1./N)*np.ones((N,D))*dmean
+    
+    # Add together
+    dx = dx1 + dsigma2
+    
+    
     pass
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
@@ -302,7 +362,15 @@ def batchnorm_backward_alt(dout, cache):
     # single statement; our implementation fits on a single 80-character line.#
     ###########################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
-
+    N,D = dout.shape
+    xhat, xdev, var, varDenom, gamma, eps = cache
+    
+    dxhat = dout*gamma
+    
+    dx = (1./N)*varDenom*(N*dxhat - np.sum(dxhat, axis=0) - xhat*np.sum(dxhat*xhat, axis=0))
+    dbeta = np.sum(dout,axis=0)
+    dgamma = np.sum(xhat*dout,axis=0)
+    
     pass
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
@@ -348,7 +416,19 @@ def layernorm_forward(x, gamma, beta, ln_param):
     # the batch norm code and leave it almost unchanged?                      #
     ###########################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
-
+    # Compute mean and variance
+    mean = np.mean(x, axis=1)
+    var = np.var(x, axis=1)
+    
+    # Compute Z
+    x = x.T
+    xdev = x - mean
+    varDenom = 1./np.sqrt(var+eps)
+    xhat = xdev*varDenom
+    xhat = xhat.T
+    out = gamma*xhat + beta
+    
+    cache = (xhat, xdev, var, varDenom, gamma, eps)
     pass
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
@@ -383,7 +463,19 @@ def layernorm_backward(dout, cache):
     # still apply!                                                            #
     ###########################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
-
+    xhat, xdev, var, varDenom, gamma, eps = cache
+    
+    
+    # dbeta and gamma @ output
+    dbeta = np.sum(dout, axis=0)
+    dgamma = np.sum(xhat*dout, axis=0)
+    dxhat = dout*gamma
+    
+    xhat = xhat.T
+    dxhat = dxhat.T
+    N,D = xhat.shape
+    dx = (1./N)*varDenom*(N*dxhat - np.sum(dxhat, axis=0) - xhat*np.sum(dxhat*xhat, axis=0))
+    dx = dx.T
     pass
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****

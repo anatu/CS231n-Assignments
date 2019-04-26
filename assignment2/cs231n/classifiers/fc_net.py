@@ -213,20 +213,21 @@ class FullyConnectedNet(object):
             if isOutputLayer:
                 self.params[Wkey] = weight_scale*np.random.randn(hidden_dims[len(hidden_dims)-1], num_classes)
                 self.params[bkey] = np.zeros(num_classes)
-            # First hidden layer, dimensions dictated by input size and first hidden dimension
-            elif isFirstHidden:
-                self.params[Wkey] = weight_scale*np.random.randn(input_dim, hidden_dims[0])
-                self.params[bkey] = np.zeros(hidden_dims[0])
-            # All other sandwich layers 
             else:
-                self.params[Wkey] = weight_scale*np.random.randn(hidden_dims[i-1], hidden_dims[i])
-                self.params[bkey] = np.zeros(hidden_dims[i])
-            
-            if self.normalization == "batchnorm" or self.normalization == "layernorm":
-                    gammaKey = 'gamma' + str(i+1)
-                    betaKey = 'beta' + str(i+1)
-                    self.params[gammaKey] = np.ones(hidden_dims[i])
-                    self.params[betaKey] = np.zeros(hidden_dims[i])                
+                # First hidden layer, dimensions dictated by input size and first hidden dimension
+                if i == 0:
+                    self.params[Wkey] = weight_scale*np.random.randn(input_dim, hidden_dims[0])
+                    self.params[bkey] = np.zeros(hidden_dims[0])
+                # All other sandwich layers 
+                else:
+                    self.params[Wkey] = weight_scale*np.random.randn(hidden_dims[i-1], hidden_dims[i])
+                    self.params[bkey] = np.zeros(hidden_dims[i])
+
+                if self.normalization == "batchnorm" or self.normalization == "layernorm":
+                        gammaKey = 'gamma' + str(i+1)
+                        betaKey = 'beta' + str(i+1)
+                        self.params[gammaKey] = np.ones(hidden_dims[i])
+                        self.params[betaKey] = np.zeros(hidden_dims[i])                
             
                 
                 
@@ -309,13 +310,15 @@ class FullyConnectedNet(object):
                 fcOut, fcCache = affine_forward(out, self.params[Wkey], self.params[bkey])
                 bOut, bCache = batchnorm_forward(fcOut, self.params[gammaKey], self.params[betaKey], self.bn_params[i])
                 rOut, rCache = relu_forward(bOut)
+                out = rOut
                 cacheDict[i+1] = (fcCache, bCache, rCache)
             elif self.normalization == "layernorm":
                 gammaKey = "gamma" + str(i+1)
                 betaKey = "beta" + str(i+1)
                 fcOut, fcCache = affine_forward(out, self.params[Wkey], self.params[bkey])
-                lOut, lCache = layernorm_forward(fcOut, self.params[gammaKey], self.params[betaKey], self.ln_params[i])
+                lOut, lCache = layernorm_forward(fcOut, self.params[gammaKey], self.params[betaKey], self.bn_params[i])
                 rOut, rCache = relu_forward(lOut)
+                out = rOut
                 cacheDict[i+1] = (fcCache, lCache, rCache)                
             else:
                 out, cache = affine_relu_forward(out, self.params[Wkey], self.params[bkey])
@@ -401,7 +404,7 @@ class FullyConnectedNet(object):
                     fcCache, lCache, rCache = cacheDict[i]
                     dlOut = relu_backward(dx, rCache)
                     
-                    dfcOut, grads[gammaKey], grads[betaKey] = layernorm_backward(dlOut, bCache)
+                    dfcOut, grads[gammaKey], grads[betaKey] = layernorm_backward(dlOut, lCache)
                     dx, dw, db = affine_backward(dfcOut, fcCache)
                     grads[Wkey] = dw
                     grads[bkey] = db
