@@ -319,10 +319,11 @@ class FullyConnectedNet(object):
                 cacheDict[i+1] = (fcCache, lCache, rCache)                
             else:
                 out, cache = affine_relu_forward(out, self.params[Wkey], self.params[bkey])
+                cacheDict[i+1] = cache
             
             if self.use_dropout:
                 dropKey = 'dropout' + str(i+1)
-                out, caches[dropKey] = dropout_forward(out, self.dropout_param)
+                out, cacheDict[dropKey] = dropout_forward(out, self.dropout_param)
             
         # Last layer
         Wkey = "W" + str(self.num_layers)
