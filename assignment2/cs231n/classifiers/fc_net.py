@@ -203,7 +203,33 @@ class FullyConnectedNet(object):
         # parameters should be initialized to zeros.                               #
         ############################################################################
         # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
-
+        for i in range(self.num_layers):
+            Wkey = "W" + str(i+1)
+            bkey = "b" + str(i+1)
+            
+            isOutputLayer = (i == self.num_layers - 1)
+            isFirstHidden = (i == 0)
+            # Output, dimensions are number of classes and the last hidden dimension
+            if isOutputLayer:
+                self.params[Wkey] = weight_scale*np.random.randn(hidden_dims[len(hidden_dims)-1], num_classes)
+                self.params[bkey] = np.zeros(num_classes)
+            # First hidden layer, dimensions dictated by input size and first hidden dimension
+            elif isFirstHidden:
+                self.params[Wkey] = weight_scale*np.random.randn(input_dim, hidden_dims[0])
+                self.params[bkey] = np.zeros(hidden_dims[0])
+            # All other sandwich layers 
+            else:
+                self.params[Wkey] = weight_scale*np.random.randn(hidden_dims[i-1], hidden_dims[i])
+                self.params[bkey] = np.zeros(hidden_dims[i])
+            
+            if self.normalization == "batchnorm" or self.normalization == "layernorm":
+                    gammaKey = 'gamma' + str(i+1)
+                    betaKey = 'beta' + str(i+1)
+                    self.params[gammaKey] = np.ones(hidden_dims[i])
+                    self.params[betaKey] = np.zeros(hidden_dims[i])                
+            
+                
+                
         pass
 
         # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
@@ -266,7 +292,46 @@ class FullyConnectedNet(object):
         # layer, etc.                                                              #
         ############################################################################
         # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
+        cacheDict = {}
+        
+        # Deal with last layer separately
+        for i in range(self.num_layers-1):
+            Wkey = "W" + str(i+1)
+            bkey = "b" + str(i+1)
 
+            if (i == 0):
+                out = X
+
+            # Determine normalization
+            if self.normalization == "batchnorm":
+                gammaKey = "gamma" + str(i+1)
+                betaKey = "beta" + str(i+1)
+                fcOut, fcCache = affine_forward(out, self.params[Wkey], self.params[bkey])
+                bOut, bCache = batchnorm_forward(fcOut, self.params[gammaKey], self.params[betaKey], self.bn_params[i])
+                rOut, rCache = relu_forward(bOut)
+                cacheDict[i+1] = (fcCache, bCache, rCache)
+            elif self.normalization == "layernorm":
+                gammaKey = "gamma" + str(i+1)
+                betaKey = "beta" + str(i+1)
+                fcOut, fcCache = affine_forward(out, self.params[Wkey], self.params[bkey])
+                lOut, lCache = layernorm_forward(fcOut, self.params[gammaKey], self.params[betaKey], self.ln_params[i])
+                rOut, rCache = relu_forward(lOut)
+                cacheDict[i+1] = (fcCache, lCache, rCache)                
+            else:
+                out, cache = affine_relu_forward(out, self.params[Wkey], self.params[bkey])
+            
+            if self.use_dropout:
+                dropKey = 'dropout' + str(i+1)
+                out, caches[dropKey] = dropout_forward(out, self.dropout_param)
+            
+        # Last layer
+        Wkey = "W" + str(self.num_layers)
+        bkey = "b" + str(self.num_layers)
+        scores, cacheDict[self.num_layers] = affine_forward(out, self.params[Wkey], self.params[bkey])
+
+            
+            
+            
         pass
 
         # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
@@ -293,7 +358,61 @@ class FullyConnectedNet(object):
         # of 0.5 to simplify the expression for the gradient.                      #
         ############################################################################
         # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
+        loss, dx = softmax_loss(scores,y)
+        
+        # Iterate backwards through the layers since we're doing the
+        # backwards pass
+        for i in range(self.num_layers, 0, -1):
+            Wkey = "W" + str(i)
+            bkey = "b" + str(i)
+            loss = loss + 0.5*self.reg*np.sum(np.square(self.params[Wkey]))
+            
+            
+            isLastHidden = (i == self.num_layers)
+            if isLastHidden:
+                dx, dw, db = affine_backward(dx, cacheDict[i])
+                grads[Wkey] = dw
+                grads[bkey] = db
+            # All other layers
+            else:
+                # Update dx if dropout is enabled
+                if self.use_dropout:
+                    dKey = "dropout" + str(i)
+                    dx = dropout_backward(dx, cacheDict[dKey])
+                
+                # Construct backward pass as relu to normalizer (batch or layer) to affine backwards
+                if self.normalization == "batchnorm":
+                    gammaKey = "gamma" + str(i)
+                    betaKey = "beta" + str(i)
+                    
+                    fcCache, bCache, rCache = cacheDict[i]
+                    dbOut = relu_backward(dx, rCache)
+                    
+                    dfcOut, grads[gammaKey], grads[betaKey] = batchnorm_backward(dbOut, bCache)
+                    dx, dw, db = affine_backward(dfcOut, fcCache)
+                    grads[Wkey] = dw
+                    grads[bkey] = db
+                    
+                elif self.normalization == "layernorm":
+                    gammaKey = "gamma" + str(i)
+                    betaKey = "beta" + str(i)
+                    
+                    fcCache, lCache, rCache = cacheDict[i]
+                    dlOut = relu_backward(dx, rCache)
+                    
+                    dfcOut, grads[gammaKey], grads[betaKey] = layernorm_backward(dlOut, bCache)
+                    dx, dw, db = affine_backward(dfcOut, fcCache)
+                    grads[Wkey] = dw
+                    grads[bkey] = db
+                # No normalization
+                else:
+                    dx, dw, db = affine_relu_backward(dx, cacheDict[i])
+                    grads[Wkey] = dw
+                    grads[bkey] = db
+                    
 
+            grads[Wkey] += self.reg * self.params[Wkey]
+            
         pass
 
         # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
