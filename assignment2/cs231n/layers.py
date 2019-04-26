@@ -619,7 +619,48 @@ def conv_forward_naive(x, w, b, conv_param):
     # Hint: you can use the function np.pad for padding.                      #
     ###########################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
-
+    # Unpack sizes
+    N, C, H, W = x.shape
+    F, C, HH, WW = w.shape
+    
+    # Unpack parameters
+    pad = conv_param["pad"]
+    stride = conv_param["stride"]
+    
+    # Compute output vol
+    Hprime = int(1 + (H + 2*pad - HH)/stride)
+    Wprime = int(1 + (W + 2*pad - WW)/stride)
+    
+    # Apply padding to image (only on the planar dimension)
+    pads = ((0,0), (0,0), (pad,pad), (pad,pad))
+    xPad = np.pad(x, pads, mode="constant")
+    
+    # Initialize out
+    out = np.zeros((N, F, Hprime, Wprime))    
+    
+    # Slide the filter masks across the image
+    # Go through each point
+    for point in range(N):
+        # SLide along height
+        for py in range(Hprime):
+            # Start of window jumps by the stride
+            h_i = py*stride
+            # End is start + height of filter mask
+            h_f = h_i + HH
+            for px in range(Wprime):
+                # Analogoous for width
+                w_i = px*stride
+                w_f = w_i + WW
+                # Pull the mask region for that point using the h and w windows
+                mask_region = xPad[point,:,h_i:h_f,w_i:w_f]
+                # Iterate through the filters and apply weights
+                for f in range(F):
+                    # Pull weights for the f-th filter
+                    filtWeights = w[f,:,:,:]
+                    # Calculate result + bias, store in out
+                    out[point, f, px, py] = np.sum(filtWeights*mask_region) + b[f]
+                    
+            
     pass
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
