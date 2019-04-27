@@ -628,8 +628,8 @@ def conv_forward_naive(x, w, b, conv_param):
     stride = conv_param["stride"]
     
     # Compute output vol
-    Hprime = int(1 + (H + 2*pad - HH)/stride)
-    Wprime = int(1 + (W + 2*pad - WW)/stride)
+    Hprime = np.int((H + 2*pad - HH)/stride) + 1
+    Wprime = np.int((W + 2*pad - WW)/stride) + 1
     
     # Apply padding to image (only on the planar dimension)
     pads = ((0,0), (0,0), (pad,pad), (pad,pad))
@@ -652,15 +652,14 @@ def conv_forward_naive(x, w, b, conv_param):
                 w_i = px*stride
                 w_f = w_i + WW
                 # Pull the mask region for that point using the h and w windows
-                mask_region = xPad[point,:,h_i:h_f,w_i:w_f]
+                mask_region = xPad[point,:,w_i:w_f,h_i:h_f]
                 # Iterate through the filters and apply weights
                 for f in range(F):
                     # Pull weights for the f-th filter
                     filtWeights = w[f,:,:,:]
                     # Calculate result + bias, store in out
                     out[point, f, px, py] = np.sum(filtWeights*mask_region) + b[f]
-                    
-            
+                                
     pass
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
@@ -689,6 +688,43 @@ def conv_backward_naive(dout, cache):
     # TODO: Implement the convolutional backward pass.                        #
     ###########################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
+    # Unpack the cache
+    x, w, b, conv_param = cache
+
+    pad = conv_param["pad"]
+    stride = conv_param["stride"]
+
+    N, C, H, W = x.shape
+    F, C, HH, WW, = w.shape
+
+    # Get output sizes from upstream
+    _, _, Hprime, Wprime = dout.shape
+
+    # Apply padding
+    pads = ((0,0), (0,0), (pad, pad), (pad, pad))
+    xPad = np.pad(x, pads, mode="constant")
+    dxPad = np.zeros(xPad.shape)
+
+    dx = np.zeros(x.shape)
+    dw = np.zeros(w.shape)
+    db = np.sum(dout, axis=(0,2,3))
+
+    for point in range(N):
+        for py in range(Hprime):
+            h_i = py*stride
+            h_f = h_i + HH
+            for px in range(Wprime):
+                w_i = px*stride
+                w_f = w_i + WW
+                mask_region = xPad[point,:,h_i:h_f,w_i:w_f]
+                for f in range(F):
+                    # Propagate the gradients
+                    dw[f] = dw[f] + mask_region*dout[point, f, py, px]
+                    dxPad[point, :, h_i:h_f, w_i:w_f] = dxPad[point, :, h_i:h_f, w_i:w_f] + w[f]*dout[point, f, py, px]
+
+    # Undo the padding for the final dx
+    dx = dxPad[:, :, pad:-pad, pad:-pad]
+
 
     pass
 
@@ -723,6 +759,28 @@ def max_pool_forward_naive(x, pool_param):
     # TODO: Implement the max-pooling forward pass                            #
     ###########################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
+    hPool = pool_param["pool_height"]
+    wPool = pool_param["pool_width"]
+    stride = pool_param["stride"]
+    N, C, H, W = x.shape
+
+    Hprime = 1 + np.int((H-hPool)/stride)
+    Wprime = 1 + np.int((W-wPool)/stride)
+
+    out = np.zeros((N, C, Hprime, Wprime))
+
+    for point in range(N):
+        for chan in range(C):
+            for py in range(Hprime):
+                h_i = py*stride
+                h_f = h_i + hPool
+                for px in range(Wprime):
+                    w_i = px*stride
+                    w_f = w_i + wPool
+                    # Form the region and pool over it by taking the max
+                    poolRegion = x[point, chan, h_i:h_f, w_i:w_f]
+                    out[point, chan, py, px] = np.max(poolRegion)
+
 
     pass
 
@@ -750,6 +808,28 @@ def max_pool_backward_naive(dout, cache):
     # TODO: Implement the max-pooling backward pass                           #
     ###########################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
+    x, pool_param = cache
+    hPool = pool_param["pool_height"]
+    wPool = pool_param["pool_width"]
+    stride = pool_param["stride"]
+    N,C,H,W = x.shape
+
+    _, _, Hprime, Wprime = dout.shape
+
+    dx = np.zeros(x.shape)
+
+    for point in range(N):
+        for chan in range(C):
+            for py in range(Hprime):
+                h_i = py*stride
+                h_f = h_i + hPool
+                for px in range(Wprime):
+                    w_i = px*stride
+                    w_f = w_i + wPool
+                    # Apply the max-pool mask and propagate upwards by dout multiplication
+                    poolRegion = x[point, chan, h_i:h_f, w_i:w_f]
+                    mask = (poolRegion == np.max(poolRegion))
+                    dx[point, chan, h_i:h_f, w_i:w_f] = dout[point, chan, py, px]*mask
 
     pass
 
