@@ -970,7 +970,7 @@ def spatial_groupnorm_forward(x, gamma, beta, G, gn_param):
     out = gamma*out + beta
 
     # Update cache values
-    xhat, xdev, var, varDenom, gamma, eps = cache
+    xhat, xdev, var, varDenom, _, eps = cache
     cache = (xhat, xdev, var, varDenom, gamma, beta, eps, G)
     pass
 
@@ -1011,16 +1011,15 @@ def spatial_groupnorm_backward(dout, cache):
     dgamma = np.sum(dout*xhat, axis = (0,2,3), keepdims = True)
     dbeta = np.sum(dout, axis = (0,2,3), keepdims = True)
 
-    newDim = (C//G)*W*H
+    newDims = (N*G, (C//G)*W*H)
 
-    xhat = xhat.reshape(N*G, newDim)
-    dxhat = dxhat.reshape(N*G, newDim)
+    xhat = xhat.reshape(newDims).T
+    dxhat = dxhat.reshape(newDims).T
 
     newN = dxhat.shape[0]
-    foo = newN*dxhat - np.sum(dxhat, axis=0, keepdims=True) - xhat*np.sum(dxhat*xhat, axis=0,keepdims=True)
-    dx = (1./newN)*(newN*dxhat - np.sum(dxhat, axis=0, keepdims=True) - xhat*np.sum(dxhat*xhat, axis=0,keepdims=True)).T*varDenom
+    dx = (1./newN)*varDenom*(newN*dxhat - np.sum(dxhat, axis=0) - xhat*np.sum(dxhat*xhat, axis=0))
 
-    dx = dx.reshape(N,C,H,W)
+    dx = dx.T.reshape(N,C,H,W)
 
     pass
 
