@@ -35,7 +35,11 @@ def rnn_step_forward(x, prev_h, Wx, Wh, b):
     # and cache variables respectively.                                          #
     ##############################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
-
+    # Compute new hidden state from previous. Keep unactivated output for backprop
+    next_h_dot = np.dot(x, Wx) + np.dot(prev_h, Wh) + b
+    next_h = np.tanh(next_h_dot)
+    # Store cache as dict
+    cache = {"x": x, "Wx": Wx, "Wh": Wh, "prev_h": prev_h, "next_h_dot": next_h_dot, "next_h": next_h}
     pass
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
@@ -68,7 +72,32 @@ def rnn_step_backward(dnext_h, cache):
     # of the output value from tanh.                                             #
     ##############################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
-
+    # Unpack cache
+    x = cache["x"]
+    Wx = cache["Wx"]
+    Wh = cache["Wh"]
+    next_h_dot = cache["next_h_dot"]
+    next_h = cache["next_h"]
+    prev_h = cache["prev_h"]
+    
+    # Derivative of z=tanh(u) is dz = (1-z^2)du, where u is the
+    # raw hidden layer dot product 
+    dh = (1 - (next_h*next_h))*dnext_h
+    dprev_h = np.dot(dh, Wh.T)
+    
+    # Compute gradients of feature and hidden state
+    # using gradient of hidden state
+    dx = np.dot(dh, Wx.T)    
+    dprev_h = np.dot(dh, Wh.T)
+    
+    # Compute gradients on weights
+    dWx = np.dot(x.T, dh)
+    # Here we use prev_h as it is "local" to this 
+    # step during backprop
+    dWh = np.dot(prev_h.T, dh)
+    
+    db = np.sum(dh, axis=0)
+    
     pass
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
