@@ -39,7 +39,7 @@ def rnn_step_forward(x, prev_h, Wx, Wh, b):
     next_h_dot = np.dot(x, Wx) + np.dot(prev_h, Wh) + b
     next_h = np.tanh(next_h_dot)
     # Store cache as dict
-    cache = {"x": x, "Wx": Wx, "Wh": Wh, "prev_h": prev_h, "next_h_dot": next_h_dot, "next_h": next_h}
+    cache = (x, Wx, Wh, b, next_h, prev_h)
     pass
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
@@ -73,15 +73,10 @@ def rnn_step_backward(dnext_h, cache):
     ##############################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     # Unpack cache
-    x = cache["x"]
-    Wx = cache["Wx"]
-    Wh = cache["Wh"]
-    next_h_dot = cache["next_h_dot"]
-    next_h = cache["next_h"]
-    prev_h = cache["prev_h"]
+    x, Wx, Wh, b, next_h, prev_h = cache
     
     # Derivative of z=tanh(u) is dz = (1-z^2)du, where u is the
-    # raw hidden layer dot product 
+    # hidden state 
     dh = (1 - (next_h*next_h))*dnext_h
     dprev_h = np.dot(dh, Wh.T)
     
@@ -132,7 +127,28 @@ def rnn_forward(x, h0, Wx, Wh, b):
     # above. You can use a for loop to help compute the forward pass.            #
     ##############################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
-
+    # Unpack shapes
+    N, T, D = x.shape
+    _, H = h0.shape
+    
+    prev_h = h0
+    cache = ()
+    
+    h = np.zeros((N,T,H))
+    
+    # Iterate through the T input vectors
+    for vec in range(T):
+        # Perform the forward step for that vector and assign into
+        # that part of the new hidden state
+        h[:,vec,:], worker = rnn_step_forward(x[:, vec, :], prev_h, Wx, Wh, b)
+        # The above is the current hidden state which becomes the previous
+        # hidden state for the next pass
+        prev_h = h[:,vec,:]
+        # Update the cache values
+        cache = cache + worker
+    
+    
+    
     pass
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
