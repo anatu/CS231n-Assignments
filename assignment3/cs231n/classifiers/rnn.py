@@ -142,6 +142,57 @@ class CaptioningRNN(object):
         ############################################################################
         # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
+        ### FORWARD PASS
+        # (1) Use an affine transformation to compute the initial hidden state     #
+        #     from the image features. This should produce an array of shape (N, H)#
+        h0, initCache = affine_forward(features, W_proj, b_proj)
+        # (2) Use a word embedding layer to transform the words in captions_in     #
+        #     from indices to vectors, giving an array of shape (N, T, W).         #
+        x, embeddingsCache = word_embedding_forward(captions_in, W_embed)
+        # (3) Use either a vanilla RNN or LSTM (depending on self.cell_type) to    #
+        #     process the sequence of input word vectors and produce hidden state  #
+        #     vectors for all timesteps, producing an array of shape (N, T, H).    #
+        # Check for LSTM
+        if self.cell_type == "lstm":
+            h, hiddenCache = lstm_forward(x, h0, Wx, Wh, b)
+        # Otherwise, vanilla RNN
+        else:
+             h, hiddenCache = rnn_forward(x, h0, Wx, Wh, b)
+        # (4) Use a (temporal) affine transformation to compute scores over the    #
+        #     vocabulary at every timestep using the hidden states, giving an      #
+        #     array of shape (N, T, V).                                            #        
+        scores, cacheTemporal = temporal_affine_forward(h, W_vocab, b_vocab)
+        # (5) Use (temporal) softmax to compute loss using captions_out, ignoring  #
+        #     the points where the output word is <NULL> using the mask above.     #
+        loss, dscores = temporal_softmax_loss(scores, captions_out, mask)
+                
+        ### BACKWARD PASS
+        # Simply call the backward step of the above operations
+        # Temporal backward
+        dh, dW_vocab, db_vocab = temporal_affine_backward(dscores, cacheTemporal)
+        # Cell backward
+        if self.cell_type == "lstm":
+            dx, dh0, dWx, dWh, db = lstm_backward(dh, hiddenCache)
+        else:
+            dx, dh0, dWx, dWh, db = rnn_backward(dh, hiddenCache)
+        # Embeddings backward
+        dW_embed = word_embedding_backward(dx, embeddingsCache)
+        # Initial affine hidden state backward
+        _, dW_proj, db_proj = affine_backward(dh0, initCache)
+        
+        # Store gradients
+        grads["W_vocab"] = dW_vocab
+        grads["W_embed"] = dW_embed
+        grads["W_proj"] = dW_proj
+        grads["Wx"] = dWx
+        grads["Wh"] = dWh
+        
+        grads["b_vocab"] = db_vocab
+        grads["b_proj"] = db_proj
+        grads["b"] = db
+        
+        
+        
         pass
 
         # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
@@ -210,7 +261,23 @@ class CaptioningRNN(object):
         # you are using an LSTM, initialize the first cell state to zeros.        #
         ###########################################################################
         # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
-
+        # Test-time pass therefore don't need any cache information
+        # Initialize the hidden state using start token
+        # First affine forward pass
+        h, _ = affine_forward(features, W_proj, b_proj)
+        captions[:,0] = self._start
+        
+        cell = np.zeros(h.shape)
+        for i in range(max_length-1):
+            # Do the forward pass with embeddings
+            x, _ = word_embedding_forward(captions[:,i], W_embed)
+            if self.cell_type == "lstm":
+                h, cell, _ = lstm_step_forward(x, h, cell, Wx, Wh, b)
+            else:
+                h, _ = rnn_step_forward(x, h, Wx, Wh, b)
+            # Output layer scores for the ith set of captions
+            scores, _ = affine_forward(h, W_vocab, b_vocab)
+            captions[:, i+1] = np.argmax(scores, axis=1)
         pass
 
         # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****

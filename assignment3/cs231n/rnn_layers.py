@@ -77,7 +77,7 @@ def rnn_step_backward(dnext_h, cache):
     
     # Derivative of z=tanh(u) is dz = (1-z^2)du, where u is the
     # hidden state 
-    dh = (1 - (next_h*next_h))*dnext_h
+    dh = dnext_h*(1 - (next_h*next_h))
     dprev_h = np.dot(dh, Wh.T)
     
     # Compute gradients of feature and hidden state
@@ -132,7 +132,7 @@ def rnn_forward(x, h0, Wx, Wh, b):
     _, H = h0.shape
     
     prev_h = h0
-    cache = ()
+    cache = {}
     
     h = np.zeros((N,T,H))
     
@@ -145,8 +145,7 @@ def rnn_forward(x, h0, Wx, Wh, b):
         # hidden state for the next pass
         prev_h = h[:,vec,:]
         # Update the cache values
-        cache = cache + worker
-    
+        cache[vec] = worker
     
     
     pass
@@ -184,7 +183,36 @@ def rnn_backward(dh, cache):
     # defined above. You can use a for loop to help compute the backward pass.   #
     ##############################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
-
+    # Unpack dimensions
+    N, T, H = dh.shape
+    x = cache[0][0]
+    _, D = x.shape
+    
+    # Initialize outputs
+    hiddenDim = (N,H)
+    dx = np.zeros((N,T,D))
+    dWx = np.zeros((D,H))
+    dWh = np.zeros((H,H))
+    dh0 = np.zeros(hiddenDim)
+    db = np.zeros(H)
+    dprev_h = np.zeros(hiddenDim)
+    
+    Trange = list(reversed(range(T)))
+    
+    for vec in range(T-1,-1,-1):
+        # Compute the gradient of the next hidden state as 
+        # current plus previous
+        dh_next = dh[:,vec,:] + dprev_h
+        
+        # Perform the backward step
+        dx_vec, dprev_h, dWx_i, dWh_i, db_i = rnn_step_backward(dh_next, cache[vec])
+        dx[:,vec,:] = dx_vec
+        
+        dWx = dWx + dWx_i
+        dWh = dWh + dWh_i
+        db = db + db_i
+        
+    dh0 = dprev_h
     pass
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
@@ -216,7 +244,11 @@ def word_embedding_forward(x, W):
     # HINT: This can be done in one line using NumPy's array indexing.           #
     ##############################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
-
+    # Array-index the batch of indices directly into W
+    # therefore out is the embedded sequence of T words each into a D-dimensional
+    # vector representation
+    out = W[x]
+    cache = (x,W)
     pass
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
@@ -249,7 +281,13 @@ def word_embedding_backward(dout, cache):
     # HINT: Look up the function np.add.at                                       #
     ##############################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
-
+    # Unpack cache
+    x, W = cache
+    
+    dW = np.zeros(W.shape)
+    
+    # Add dW and upstream gradients at x indices
+    np.add.at(dW, x, dout)
     pass
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
