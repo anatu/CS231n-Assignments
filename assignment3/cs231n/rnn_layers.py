@@ -339,7 +339,20 @@ def lstm_step_forward(x, prev_h, prev_c, Wx, Wh, b):
     # You may want to use the numerically stable sigmoid implementation above.  #
     #############################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
+    # Get H from one of the inputs
+    _, H = prev_h.shape
+    # Compute activation vector (should have dimensions 4H)
+    a = np.dot(x, Wx) + np.dot(prev_h, Wh) + b
+    # Compute LSTM gates
+    i = sigmoid(a[:,:H])
+    f = sigmoid(a[:,H:2*H])
+    o = sigmoid(a[:,2*H:3*H])
+    g = np.tanh(a[:,3*H:])
 
+    # Compute outputs and form cache
+    next_c = f*prev_c + i*g
+    next_h = o*np.tanh(next_c)
+    cache = (x, Wx, Wh, b, a, i, f, o, g, prev_c, prev_h, next_c, next_h)
     pass
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
@@ -375,6 +388,56 @@ def lstm_step_backward(dnext_h, dnext_c, cache):
     # the output value from the nonlinearity.                                   #
     #############################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
+    # Unpack cache and get dimensions
+    x, Wx, Wh, b, a, i, f, o, g, prev_c, prev_h, next_c, next_h = cache
+    _, D = x.shape
+    N, H = dnext_h.shape
+
+    # Initialize outputs
+    dx = np.zeros((N,D))
+    dprev_h = np.zeros((N,H))
+    dprev_c = np.zeros((N,H))
+    dWx = np.zeros((D, 4*H))
+    dWh = np.zeros((H, 4*H))
+    db = np.zeros(4*H)
+
+    # Gradient at cell state
+    # dE/dh [dh] * dh/dc [o*dtanh(c)]
+    dc_t = dnext_h*o*(1-np.tanh(next_c)**2)
+    df = dc_t + dnext_c
+    dprev_c = f*(df)
+
+    # Unpack activation vector
+    ai = a[:, :H]
+    af = a[:, H:2*H]
+    ao = a[:, 2*H:3*H]
+    ag = a[:, 3*H:4*H]
+
+    # Gradient of gates
+    # i = sigmoid(a[:,:H])
+    # f = sigmoid(a[:,H:2*H])
+    # o = sigmoid(a[:,2*H:3*H])
+    # g = np.tanh(a[:,3*H:])
+    dai = g*df*sigmoid(ai)*(1-sigmoid(ai))
+    daf = df*prev_c*sigmoid(af)*(1-sigmoid(af))
+    dao = (dnext_h*np.tanh(next_c))*sigmoid(ao)*(1-sigmoid(ao))
+    dag = i*df*(1-np.tanh(ag)**2)
+
+    # Compute final outputs
+
+    da = np.zeros((N,4*H))
+    da[:, :H] = dai
+    da[:, H:2*H] = daf
+    da[:, 2*H:3*H] = dao
+    da[:, 3*H:] = dag
+
+    dx = np.dot(da, Wx.T)
+
+    dWx = np.dot(x.T, da)
+    dWh = np.dot(prev_h.T, da)
+    db = np.sum(da,axis=0)
+
+    dprev_h = np.dot(da, Wh.T)
 
     pass
 
