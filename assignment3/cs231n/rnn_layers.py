@@ -199,7 +199,7 @@ def rnn_backward(dh, cache):
     
     Trange = list(reversed(range(T)))
     
-    for vec in range(T-1,-1,-1):
+    for vec in Trange:
         # Compute the gradient of the next hidden state as 
         # current plus previous
         dh_next = dh[:,vec,:] + dprev_h
@@ -477,7 +477,27 @@ def lstm_forward(x, h0, Wx, Wh, b):
     # You should use the lstm_step_forward function that you just defined.      #
     #############################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
+    # Unpack shapes
+    N, T, _ = x.shape
+    _, H = h0.shape
+    
+    prev_h = h0
+    cache = {}
+    
+    h = np.zeros((N,T,H))
+    prev_c = np.zeros((N,H))
 
+    # Iterate through the T input vectors
+    for vec in range(T):
+        # Perform the forward step for that vector and assign into
+        # that part of the new hidden state
+        h[:,vec,:], next_c, worker = lstm_step_forward(x[:, vec, :], prev_h, prev_c, Wx, Wh, b)
+        # The above is the  current hidden state which becomes the previous
+        # hidden state for the next pass (same for cell)
+        prev_h = h[:,vec,:]
+        prev_c = next_c
+        # Update the cache values
+        cache[vec] = worker    
     pass
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
@@ -509,7 +529,40 @@ def lstm_backward(dh, cache):
     # You should use the lstm_step_backward function that you just defined.     #
     #############################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
+    # Unpack dimensions
+    N, T, H = dh.shape
+    x = cache[0][0]
+    _, D = x.shape
+    
+    # Initialize outputs
+    dx = np.zeros((N,T,D))
+    dh0 = np.zeros((N,H))
+    dWx = np.zeros((D,4*H))
+    dWh = np.zeros((H,4*H))
+    db = np.zeros(4*H)
+    dprev_h = np.zeros((N,H))
+    dnext_c = np.zeros((N,H))
 
+    
+    Trange = list(reversed(range(T)))
+    
+    for vec in Trange:
+        # Compute the gradient of the next hidden state as 
+        # current plus previous
+        dh_next = dh[:,vec,:] + dprev_h
+        
+        # Perform the backward step
+        dx_vec, dprev_h, dprev_c, dWx_i, dWh_i, db_i = lstm_step_backward(dh_next, dnext_c, cache[vec])
+        dx[:,vec,:] = dx_vec
+        
+        dWx = dWx + dWx_i
+        dWh = dWh + dWh_i
+        db = db + db_i
+        
+        dh_next = dprev_c
+        dnext_c = dprev_c
+
+    dh0 = dprev_h    
     pass
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
